@@ -2,7 +2,6 @@
 #include "TFT.h" 
 #include "SPI.h" 
 
-//Libraries
 #define cs 10      
 #define dc 9       
 #define rst 8      
@@ -10,7 +9,6 @@
 #define buttonY 7
 #define buttonZ 2
 
-//TFT screen
 TFT screen = TFT(cs, dc, rst);
 
 // About Screens
