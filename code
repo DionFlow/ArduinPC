@@ -1,0 +1,897 @@
+//Hello World
+#include "TFT.h" 
+#include "SPI.h" 
+
+//Libraries
+#define cs 10      
+#define dc 9       
+#define rst 8      
+#define buttonX 4
+#define buttonY 7
+#define buttonZ 2
+
+//TFT screen
+TFT screen = TFT(cs, dc, rst);
+
+// About Screens
+// 0 - main, 1 - programs, 2 - games, 3 - apps, 4 - detricomicon, 
+// 5 - folders, 6 - calculator, 7 - cyberspace, 8 - maps
+// 9 - test0
+int currentScreen = 0;
+
+// Detricomicon ints
+int playerPosition = 1;  
+int enemyX = 1; 
+int enemyY = 0; 
+bool gameActive = false;
+bool gameOver = false;
+unsigned long lastEnemyMove = 0;
+int enemyMoveDelay = 150;
+int enemyStep = 60;
+
+// Folders
+int folderLevel = 0;      // 0 - root, 1 - inside folder
+int folderSelection = 0;  // 0 - folder1, 1 - folder2, 2 - folder3
+const char* currentFolder = "";
+
+// Calculator ints
+int calcCursorPos = 5;  //(0-14)
+String calcDisplay = "";  
+float calcResult = 0;  
+bool calcError = false;  
+
+// Calculator matrix
+const char* calcButtons[3][5] = {
+  {"=", "+", "-", "x", ":"},
+  {"1", "2", "3", "4", "5"},
+  {"6", "7", "8", "9", "0"}
+};
+
+// Cyberspace ints
+String cyberspaceInput = ""; 
+int cyberspaceResult = -1;  
+
+void setup() {
+  pinMode(buttonX, INPUT_PULLUP);
+  pinMode(buttonY, INPUT_PULLUP);
+  pinMode(buttonZ, INPUT_PULLUP);
+
+  screen.begin();
+  screen.background(0, 0, 0);
+  screen.setTextSize(1);
+  screen.stroke(255, 255, 255);
+  screen.setRotation(2);
+  
+  showMainScreen();
+}
+
+void loop() {
+  if (currentScreen == 0) {  // -Main screen
+    if (digitalRead(buttonX) == LOW) {
+      currentScreen = 1;  // programs
+      showProgramsScreen();
+      delay(200);
+    }
+    else if (digitalRead(buttonY) == LOW) {
+      currentScreen = 5;  // folders
+      folderLevel = 0;
+      folderSelection = 0;
+      showFoldersScreen();
+      delay(200);
+    }
+    else if (digitalRead(buttonZ) == LOW) {  // cyberspace
+      currentScreen = 7;
+      showCyberspaceScreen();
+      delay(200);
+    }
+  }
+  
+  else if (currentScreen == 1) {  // -Programs
+    if (digitalRead(buttonX) == LOW) {
+      currentScreen = 2;  // games
+      showGamesScreen();
+      delay(200);
+    }
+    else if (digitalRead(buttonY) == LOW) {
+      currentScreen = 3;  // apps
+      showAppsScreen();
+      delay(200);
+    }
+    else if (digitalRead(buttonZ) == LOW) {
+      currentScreen = 0;  // main
+      showMainScreen();
+      delay(200);
+    }
+  }
+  
+  else if (currentScreen == 2) {  // games
+    if (digitalRead(buttonX) == LOW) {
+      currentScreen = 4;  // detricomicon
+      showDetricomiconScreen();
+      gameActive = true;
+      gameOver = false;
+      playerPosition = 1;
+      enemyX = random(0, 3);
+      enemyY = 20;
+      delay(200);
+    }
+    else if (digitalRead(buttonZ) == LOW) {
+      currentScreen = 1;  // programs
+      showProgramsScreen();
+      delay(200);
+    }
+  }
+  
+  else if (currentScreen == 3) {  // apps
+    if (digitalRead(buttonX) == LOW) {
+      currentScreen = 6;  // calculator
+      showCalculatorScreen();
+      delay(200);
+    }
+    else if (digitalRead(buttonY) == LOW) {
+      currentScreen = 8;  // maps
+      showMapsScreen();
+      delay(200);
+    }
+    else if (digitalRead(buttonZ) == LOW) {
+      currentScreen = 1;  // programs
+      showProgramsScreen();
+      delay(200);
+    }
+  }
+  
+  else if (currentScreen == 4) {  // detricomicon
+    gameLoop();
+  }
+  
+  else if (currentScreen == 5) {  // folders
+    foldersLoop();
+  }
+  
+  else if (currentScreen == 6) {  // Calculator
+    calculatorLoop();
+  }
+  
+  else if (currentScreen == 7) {  // Cyberspace
+    cyberspaceLoop();
+  }
+  
+  else if (currentScreen == 8) {  // Maps
+    mapsLoop();
+  }
+
+  else if (currentScreen == 9) {  //Test0
+    testLoop();
+  }
+}
+
+void gameLoop() {
+  // Player
+  if (digitalRead(buttonX) == LOW) {
+    playerPosition = 0;
+    updateGameDisplay();
+    delay(150);
+  }
+  else if (digitalRead(buttonY) == LOW) {
+    playerPosition = 1;
+    updateGameDisplay();
+    delay(150);
+  }
+  else if (digitalRead(buttonZ) == LOW) {
+    if (gameOver) {
+      currentScreen = 2;  // games
+      showGamesScreen();
+    } else {
+      playerPosition = 2;
+      updateGameDisplay();
+    }
+    delay(150);
+  }
+  
+  // Enemy blue dot
+  if (gameActive && !gameOver && millis() - lastEnemyMove > enemyMoveDelay) {
+    enemyY += enemyStep;
+    
+    if (enemyY >= 115) {
+      if (enemyX == playerPosition) {
+        gameOver = true;
+        updateGameDisplay();
+      } else {
+        enemyY = 20;
+        enemyX = random(0, 3);
+        updateGameDisplay();
+      }
+    }
+    
+    updateGameDisplay();
+    lastEnemyMove = millis();
+  }
+}
+
+void foldersLoop() {
+  if (digitalRead(buttonX) == LOW) {  // text
+    screen.background(0, 0, 0);
+    screen.text("DUINPC://folders/text", 0, 152);
+    screen.text("x sup.note", 10, 50);
+    screen.text("y newnote.note", 10, 60);
+    screen.text("z back", 10, 70);
+    delay(200);
+    
+    while(digitalRead(buttonZ) == HIGH) {
+      if (digitalRead(buttonX) == LOW) {
+        screen.background(0, 0, 0);
+        screen.text("folders/text/sup.note", 0, 0);
+        screen.text("   MO  TU  WE  TH  FR", 0, 20);
+        screen.text("1 Bio Alg IT  Rus Phy", 0, 30);
+        screen.text("2 His Lit Che Eng Bio", 0, 40);
+        screen.text("3 Lit His Man Alg Gem", 0, 50);
+        screen.text("4 Phy Gem Lit Phy Ran", 0, 60);
+        screen.text("5 Alg Eng Geo PE  Che", 0, 70);
+        screen.text("6 Geo Saf Alg Soc Eng", 0, 80);
+        screen.text("7     Rus PE      Rus", 0, 90);
+        screen.text("z back", 30, 100);
+        delay(200);
+        
+        // wait
+        while(digitalRead(buttonZ) == HIGH) {
+          delay(50);
+        }
+        // text
+        screen.background(0, 0, 0);
+        screen.text("DUINPC://folders/text", 0, 152);
+        screen.text("x sup.note", 10, 50);
+        screen.text("y newnote.note", 10, 60);
+        screen.text("z back", 10, 70);
+        delay(200);
+      }
+      
+      else if (digitalRead(buttonY) == LOW) {
+        screen.background(0, 0, 0);
+        screen.text("ers/text/newnote.note", 0, 0);
+        screen.text("1) 08:30-09:15", 10, 20);
+        screen.text("2) 09:35-10:20", 10, 30);
+        screen.text("3) 10:40-11:25", 10, 40);
+        screen.text("4) 11:50-12:35", 10, 50);
+        screen.text("5) 12:55-13:40", 10, 60);
+        screen.text("6) 13:50-14:35", 10, 70);
+        screen.text("7) 14:40-15:25", 10, 80);
+        screen.text("z back", 30, 110);
+        delay(200);
+        
+        // wait
+        while(digitalRead(buttonZ) == HIGH) {
+          delay(50);
+        }
+        // text
+        screen.background(0, 0, 0);
+        screen.text("DUINPC://folders/text", 0, 152);
+        screen.text("x sup.note", 10, 50);
+        screen.text("y newnote.note", 10, 60);
+        screen.text("z back", 10, 70);
+        delay(200);
+      }
+      delay(50);
+    }
+    showFoldersScreen();
+    delay(200);
+  }
+  
+  else if (digitalRead(buttonY) == LOW) {  // system
+    screen.background(0, 0, 0);
+    screen.text("INPC://folders/system", 0, 152);
+    screen.text("x system.sys", 10, 50);
+    screen.text("y nothing.bin", 10, 60);
+    screen.text("z back", 10, 70);
+    delay(200);
+    
+    while(digitalRead(buttonZ) == HIGH) {
+      if (digitalRead(buttonX) == LOW) {
+        screen.background(0, 0, 0);
+        screen.text("system.sys", 0, 0);
+        screen.text("2048 bytes SRAM", 0, 20);
+        screen.text("30720 bytes Memory", 0, 30);
+        screen.text("TFT 1.8/Arduino Nano", 0, 40);
+        screen.text("CPU cores 1", 0, 50);
+        screen.text("10000 mAh", 0, 60);
+        screen.text("ARDUINPC v1.2", 15, 70);
+        screen.text("(18.03.2026 build)", 10, 80);
+        screen.text("z back", 30, 120);
+        delay(200);
+        
+        while(digitalRead(buttonZ) == HIGH) {
+          delay(50);
+        }
+        //system
+        screen.background(0, 0, 0);
+        screen.text("INPC://folders/system", 0, 152);
+        screen.text("x system.sys", 10, 50);
+        screen.text("y nothing.bin", 10, 60);
+        screen.text("z back", 10, 70);
+        delay(200);
+      }
+      
+      else if (digitalRead(buttonY) == LOW) {
+        screen.background(0, 0, 0);
+        screen.text("rs/system/nothing.bin", 0, 0);
+        screen.text("Your Mom", 30, 50);
+        screen.text("Is so fat...", 30, 70);
+        screen.text("z back", 30, 100);
+        delay(200);
+        
+        while(digitalRead(buttonZ) == HIGH) {
+          delay(50);
+        }
+        //system
+        screen.background(0, 0, 0);
+        screen.text("INPC://folders/system", 0, 152);
+        screen.text("x system.sys", 10, 50);
+        screen.text("y nothing.bin", 10, 60);
+        screen.text("z back", 10, 70);
+        delay(200);
+      }
+      delay(50);
+    }
+    showFoldersScreen();
+    delay(200);
+  }
+  
+  else if (digitalRead(buttonZ) == LOW) {  // main
+    currentScreen = 0;
+    showMainScreen();
+    delay(200);
+  }
+}
+
+void calculatorLoop() {
+  // Cursor move
+  if (digitalRead(buttonX) == LOW) {
+    calcCursorPos++;
+    if (calcCursorPos >= 15) {  
+      calcCursorPos = 0;
+    }
+    drawCalculatorScreen();
+    delay(200);
+  }
+  
+  else if (digitalRead(buttonY) == LOW) {
+    int row = calcCursorPos / 5;
+    int col = calcCursorPos % 5;
+    String button = calcButtons[row][col];
+    
+    //funny buttons
+    if (button == "=") {
+      // result
+      if (calcDisplay.length() > 0) {
+        if (calcDisplay.indexOf("+") > 0) {
+          int pos = calcDisplay.indexOf("+");
+          float a = calcDisplay.substring(0, pos).toFloat();
+          float b = calcDisplay.substring(pos + 1).toFloat();
+          calcResult = a + b;
+          calcDisplay = String(calcResult);
+        }
+        else if (calcDisplay.indexOf("-") > 0) {
+          int pos = calcDisplay.indexOf("-");
+          float a = calcDisplay.substring(0, pos).toFloat();
+          float b = calcDisplay.substring(pos + 1).toFloat();
+          calcResult = a - b;
+          calcDisplay = String(calcResult);
+        }
+        else if (calcDisplay.indexOf("x") > 0) {
+          int pos = calcDisplay.indexOf("x");
+          float a = calcDisplay.substring(0, pos).toFloat();
+          float b = calcDisplay.substring(pos + 1).toFloat();
+          calcResult = a * b;
+          calcDisplay = String(calcResult);
+        }
+        else if (calcDisplay.indexOf(":") > 0) {
+          int pos = calcDisplay.indexOf(":");
+          float a = calcDisplay.substring(0, pos).toFloat();
+          float b = calcDisplay.substring(pos + 1).toFloat();
+          if (b != 0) {
+            calcResult = a / b;
+            calcDisplay = String(calcResult);
+          } else {
+            calcError = true;
+          }
+        }
+      }
+    }
+    else if (button == "+" || button == "-" || button == "x" || button == ":") {
+      if (calcDisplay.length() > 0 && !calcError) {
+        calcDisplay += button;
+      }
+    }
+    else {
+      if (!calcError) {
+        calcDisplay += button;
+      }
+    }
+    
+    drawCalculatorScreen(); 
+    delay(200);
+  }
+  
+  else if (digitalRead(buttonZ) == LOW) {
+    currentScreen = 3;  // apps
+    showAppsScreen();
+    delay(200);
+  }
+}
+
+void cyberspaceLoop() {
+  // starfall
+  if (digitalRead(buttonX) == LOW) {
+    if (cyberspaceResult == -1) { 
+      cyberspaceInput += "*";
+      drawCyberspaceScreen();
+    }
+    delay(200);
+  }
+  
+  // Check
+  else if (digitalRead(buttonY) == LOW) {
+    if (cyberspaceResult == -1) { 
+      if (cyberspaceInput == "*") {
+        cyberspaceResult = 1;  // programs
+      }
+      else if (cyberspaceInput == "**") {
+        cyberspaceResult = 2;  // games
+      }
+      else if (cyberspaceInput == "***") {
+        cyberspaceResult = 3;  // apps
+      }
+      else if (cyberspaceInput == "****") {
+        cyberspaceResult = 4;  // detricomicon
+      }
+      else if (cyberspaceInput == "*****") {
+        cyberspaceResult = 5;  // folders
+      }
+      else if (cyberspaceInput == "******") {
+        cyberspaceResult = 6;  // calculator
+      }
+      else if (cyberspaceInput == "*******") {
+        cyberspaceResult = 7;  // cyberspace
+      }
+      else if (cyberspaceInput == "********") {
+        cyberspaceResult = 8;  // maps
+      }
+      else if (cyberspaceInput == "*********") {
+        cyberspaceResult = 9;  // test0
+      }
+      else {
+        // WRONG
+        screen.stroke(0, 0, 255);
+        screen.text("Error 02", 0, 70);
+        screen.text("ARDUINPC://cyberspace", 0, 80);
+        delay(1000);
+        cyberspaceInput = ""; 
+        drawCyberspaceScreen();
+        delay(200);
+        return;
+      }
+      
+      drawCyberspaceScreen();
+      delay(1000);  
+      
+      if (cyberspaceResult >= 1 && cyberspaceResult <= 9) {
+        currentScreen = cyberspaceResult;
+        
+        switch(cyberspaceResult) {
+          case 1: showProgramsScreen(); break;
+          case 2: showGamesScreen(); break;
+          case 3: showAppsScreen(); break;
+          case 4: 
+            showDetricomiconScreen();
+            gameActive = true;
+            gameOver = false;
+            playerPosition = 1;
+            enemyX = random(0, 3);
+            enemyY = 20;
+            break;
+          case 5: showFoldersScreen(); break;
+          case 6: showCalculatorScreen(); break;
+          case 7: showCyberspaceScreen(); break; 
+          case 8: showMapsScreen(); break;
+          case 9: showTestScreen(); break;
+        }
+      }
+    }
+    delay(200);
+  }
+  
+  else if (digitalRead(buttonZ) == LOW) {
+    currentScreen = 0;  // Main
+    showMainScreen();
+    delay(200);
+  }
+}
+
+void mapsLoop() {
+  if (digitalRead(buttonZ) == LOW) {
+    currentScreen = 3;  //apps
+    showAppsScreen();
+    delay(200);
+  }
+}
+
+void updateGameDisplay() {
+  screen.stroke(0, 0, 0);
+  screen.fill(0, 0, 0);
+  screen.rect(0, 0, 160, 125);
+  
+  // Lines
+  screen.stroke(255, 255, 255);
+  screen.line(40, 0, 40, 145);
+  screen.line(85, 0, 85, 145);
+  
+  // Positions
+  screen.stroke(255, 255, 255);
+  screen.fill(0, 0, 0);
+  
+  screen.rect(5, 130, 30, 15);
+  screen.rect(45, 130, 35, 15);
+  screen.rect(90, 130, 30, 15);
+  
+  // Player
+  switch(playerPosition) {
+    case 0:
+      screen.fill(0, 255, 0);
+      screen.rect(5, 130, 30, 15);
+      break;
+    case 1:
+      screen.fill(0, 255, 0);
+      screen.rect(45, 130, 35, 15);
+      break;
+    case 2:
+      screen.fill(0, 255, 0);
+      screen.rect(90, 130, 30, 15);
+      break;
+  }
+  
+  // Enemy
+  if (!gameOver) {
+    int enemyScreenX;
+    switch(enemyX) {
+      case 0: enemyScreenX = 20; break;
+      case 1: enemyScreenX = 62; break;
+      case 2: enemyScreenX = 105; break;
+    }
+    
+    screen.stroke(255, 0, 0);
+    screen.fill(255, 0, 0);
+    screen.circle(enemyScreenX, enemyY, 8);
+  }
+  
+  screen.stroke(255, 255, 255);
+  screen.setTextSize(1);
+  screen.text("x - 1: y - 2: z - 3", 7, 150);
+  
+  // Game Over
+  if (gameOver) {
+    screen.stroke(0, 0, 255);
+    screen.setTextSize(2);
+    screen.text("GAME", 40, 50);
+    screen.text("OVER", 45, 70);
+    screen.setTextSize(1);
+    screen.stroke(255, 255, 255);
+    screen.text("z - back", 45, 100);
+  }
+}
+
+// Main Screen
+void showMainScreen() {
+  screen.fill(76, 177, 34);
+  screen.background(76, 177, 34);
+
+  screen.fill(86, 198, 38);
+  screen.stroke(86, 198, 38);
+  screen.circle(64, 80, 35);
+
+  screen.stroke(76, 177, 34);
+  screen.line(0, 90, 128, 90);
+  screen.line(0, 70, 128, 70);
+  screen.setTextSize(1);
+  screen.stroke(255, 255, 255);
+
+  screen.stroke(86, 198, 38);
+  screen.rect(0, 150, 128, 16);
+  
+  screen.stroke(255, 255, 255);
+  screen.text("ARDUINPC", 40, 152);
+  screen.circle(30, 155, 3);
+  screen.stroke(0, 255, 255);
+
+  screen.circle(44, 10, 5);
+  screen.circle(62, 10, 5);
+  screen.circle(80, 10, 5);
+  screen.stroke(255, 255, 255);
+  screen.text("x  y  z", 42, 6);
+
+  screen.stroke(255, 255, 255);
+  screen.text("x programs", 10, 50);
+  screen.text("y folders", 10, 60);
+  screen.text("z cyberspace", 10, 70);
+}
+
+// Programs Screen
+void showProgramsScreen() {
+  screen.background(76, 177, 34);
+  screen.fill(76, 177, 34);
+
+  screen.stroke(86, 198, 38);
+  screen.fill(86, 198, 38);
+  screen.rect(0, 150, 128, 16);
+
+  screen.fill(86, 198, 38);
+  screen.stroke(86, 198, 38);
+  screen.rect(30, 50, 35, 60);
+  screen.rect(30, 60, 65, 50);
+
+  screen.stroke(76, 177, 34);
+  screen.line(0, 90, 128, 90);
+  screen.line(0, 70, 128, 70);
+
+  screen.stroke(255, 255, 255);
+  screen.text("ARDUINPC://programs", 0, 152);
+  screen.text("x games", 10, 50);
+  screen.text("y apps", 10, 60);
+  screen.text("z back", 10, 70);
+}
+
+// Games Screen
+void showGamesScreen() {
+  screen.background(76, 177, 34);
+  screen.fill(76, 177, 34);
+
+  screen.stroke(86, 198, 38);
+  screen.fill(86, 198, 38);
+  screen.rect(0, 150, 128, 16);
+
+  screen.fill(86, 198, 38);
+  screen.stroke(86, 198, 38);
+  screen.rect(30, 50, 20, 60);
+  screen.rect(70, 50, 20, 60);
+  screen.rect(30, 60, 40, 35);
+
+  screen.stroke(76, 177, 34);
+  screen.line(0, 90, 128, 90);
+  screen.line(0, 70, 128, 70);
+
+  screen.stroke(255, 255, 255);
+  screen.text("INPC://programs/games", 0, 152);
+  screen.text("x detricomicon", 10, 50);
+  screen.text("y nothing", 10, 60);
+  screen.text("z back", 10, 70);
+}
+
+// Apps Screen
+void showAppsScreen() {
+  screen.background(76, 177, 34);
+  screen.fill(76, 177, 34);
+
+  screen.stroke(86, 198, 38);
+  screen.fill(86, 198, 38);
+  screen.rect(0, 150, 128, 16);
+
+  screen.fill(86, 198, 38);
+  screen.stroke(86, 198, 38);
+
+  screen.circle(60, 75, 20);
+  screen.rect(60, 80, 30, 25);
+
+  screen.stroke(76, 177, 34);
+  screen.line(0, 90, 128, 90);
+  screen.line(0, 70, 128, 70);
+
+  screen.stroke(255, 255, 255);
+  screen.text("ARDUINPC://programs/apps", 0, 152);
+  screen.text("x calculator", 10, 50);
+  screen.text("y maps", 10, 60);
+  screen.text("z back", 10, 70);
+}
+
+// Folders Screen
+void showFoldersScreen() {
+  screen.background(76, 177, 34);
+  screen.fill(76, 177, 34);
+
+  screen.stroke(86, 198, 38);
+  screen.fill(86, 198, 38);
+  screen.rect(0, 150, 128, 16);
+
+  screen.fill(86, 198, 38);
+  screen.stroke(86, 198, 38);
+  screen.rect(30, 50, 35, 60);
+  screen.rect(30, 60, 65, 50);
+
+  screen.stroke(255, 255, 255);
+  screen.text("ARDUINPC://folders", 0, 152);
+
+  screen.stroke(255, 255, 255);
+  screen.text("x text", 10, 50);
+  screen.text("y system", 10, 60);
+  screen.text("z back", 10, 70);
+}
+
+// Detricomicon Screen
+void showDetricomiconScreen() {
+  currentScreen = 4;
+  screen.background(0, 0, 0);
+  screen.line(40, 0, 40, 145);
+  screen.line(85, 0, 85, 145);
+  screen.text("x - 1: y - 2: z - 3", 7, 150);
+
+  // Rects
+  screen.rect(5, 130, 30, 15);
+  screen.rect(45, 130, 35, 15);
+  screen.rect(90, 130, 30, 15);
+
+  playerPosition = 1;
+  enemyX = random(0, 3);
+  enemyY = 20;
+  gameActive = true;
+  gameOver = false;
+  lastEnemyMove = millis();
+  
+  screen.fill(0, 255, 0);
+  screen.rect(45, 130, 35, 15);
+}
+
+// Calculator Screen
+void showCalculatorScreen() {
+  currentScreen = 6;
+  calcCursorPos = 5; 
+  calcDisplay = "";
+  calcError = false;
+  drawCalculatorScreen();
+}
+
+// Calculator
+void drawCalculatorScreen() {
+  screen.background(0, 0, 0);
+  
+  screen.text("grams/apps/calculator", 0, 0);
+  
+  screen.fill(0, 0, 0);
+  screen.stroke(255, 255, 255);
+  screen.rect(5, 15, 110, 25);
+  
+  screen.setTextSize(1);
+  screen.stroke(0, 255, 255);
+  
+  if (calcError) {
+    screen.text("Error 01", 10, 22);
+  } else if (calcDisplay.length() > 0) {
+    screen.text(calcDisplay.c_str(), 10, 22);
+  } else {
+    screen.text("0", 10, 22);
+  }
+  
+  // Buttons
+  for (int row = 0; row < 3; row++) {
+    for (int col = 0; col < 5; col++) {
+      int x = 5 + (col * 18);  
+      int y = 50 + (row * 18);
+      
+      // is Choosen 
+      int buttonIndex = row * 5 + col;
+      if (buttonIndex == calcCursorPos) {
+        screen.stroke(0, 255, 0);
+        screen.fill(0, 255, 0);
+      } else {
+        screen.stroke(255, 255, 255);
+        screen.noFill();
+      }
+      
+      // Draw Button
+      screen.rect(x, y, 15, 14);
+      screen.stroke(255, 255, 255);
+      screen.text(calcButtons[row][col], x + 3, y + 3);
+    }
+  }
+  
+  screen.stroke(150, 150, 150);
+  screen.setTextSize(1);
+  screen.text("X-move Y-select Z-back", 0, 120);
+}
+
+// Cyberspace Screen
+void showCyberspaceScreen() {
+  currentScreen = 7;
+  cyberspaceInput = ""; 
+  cyberspaceResult = -1;
+  drawCyberspaceScreen();
+}
+
+void drawCyberspaceScreen() {
+  screen.background(0, 0, 0);
+  
+  // Stars
+  screen.stroke(0, 255, 0);
+  for (int i = 0; i < 50; i++) {
+    int x = random(0, 128);
+    int y = random(0, 140);
+    screen.point(x, y);
+  }
+  
+  screen.stroke(0, 255, 0);
+  screen.setTextSize(1);
+  screen.text("> cyberspace", 25, 10);
+  
+  screen.stroke(255, 255, 255);
+  screen.text("$:/", 5, 40);
+  
+  if (cyberspaceInput.length() > 0) {
+    screen.stroke(255, 255, 255);
+    screen.text(cyberspaceInput.c_str(), 25, 40);
+  }
+  
+  if (cyberspaceResult != -1) {
+    screen.stroke(0, 255, 0);
+    screen.text("Leaving cyberspace", 10, 70);
+    
+    char loadingMsg[30];
+    sprintf(loadingMsg, "Loading screen %d...", cyberspaceResult);
+    screen.text(loadingMsg, 10, 85);
+  }
+
+  screen.stroke(150, 150, 150);
+  screen.text("x-add * y-enter z-leave", 0, 145);
+}
+
+// Maps Screen
+void showMapsScreen() {
+  currentScreen = 8;
+  screen.background(0, 0, 0); 
+  
+  screen.stroke(255, 255, 255);
+  screen.text("://programs/apps/maps", 0, 152);
+  
+  screen.stroke(100, 100, 100);
+  screen.line(0, 70, 128, 70);  
+  screen.line(0, 35, 128, 35);  
+  screen.line(0, 105, 128, 105);  
+  screen.line(35, 0, 35, 140);   
+  screen.line(70, 0, 70, 140);   
+  screen.line(105, 0, 105, 140);   
+
+  //I was too lazy to complete this
+
+  screen.stroke(255, 255, 255);
+  screen.text("z - back", 45, 140);
+}
+
+
+// Test Screen
+void showTestScreen() {
+  currentScreen = 9;
+  screen.background(0, 0, 0); 
+  
+  screen.stroke(255, 255, 255);
+  screen.text("TEST 0", 0, 152);
+  
+  // funny letters
+  screen.stroke(255, 255, 255);
+  screen.text("Q W E R T Y U I O P {", 0, 0);
+  screen.text("} A S D F G H J K : '", 0, 10);
+  screen.text("Z X C V B N M < > ? (", 0, 20);
+  screen.text("[ ] ; | . , ? / ~ ` !", 0, 30);
+  screen.text("1 2 3 4 5 6 7 8 9 0 -", 0, 40);
+  screen.text("+ _ = @ # $ % ^ & * )", 0, 50);
+
+  screen.fill(0, 0, 0);
+  screen.rect(5, 70, 5, 5);
+  screen.circle(20, 72, 2);
+  screen.triangle(33, 75, 35, 70, 38, 75);
+
+  screen.stroke(255, 255, 255);
+  screen.text("z - back", 45, 140);
+}
+
+void testLoop() {
+  if (digitalRead(buttonZ) == LOW) {
+    currentScreen = 7;  // cyberspace
+    showCyberspaceScreen();
+    delay(200);
+  }
+}
