@@ -19,4 +19,4 @@ https://github.com/adafruit/Adafruit-ST7735-RESLibrary
 - TFT GND - GND;
 - TFT VCC- 5V;
 
-code for project you can find in Code
+code for project you can find in [code](https://github.com/DionFlow/ArduinPC/blob/main/code)
